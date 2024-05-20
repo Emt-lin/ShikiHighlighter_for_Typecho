@@ -16,8 +16,8 @@ github开源地址：[ShikiHighlighter_for_Typecho][2]
 
 ## 与我联系：
 
-作者：[未央花][2]
-或者通过 Emai: emt934841028@gmail.com
+作者：[未央花][3]
+或者通过 mail: emt934841028@gmail.com
 有任何问题也可评论留言
 
 ## 感谢
