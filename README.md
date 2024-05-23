@@ -12,6 +12,8 @@
 
 可以在后台设置 Shiki 所有的高亮样式
 
+实际效果：![1716373590588.png](assets/1716373590588.png)
+
 github开源地址：[ShikiHighlighter_for_Typecho][2]
 
 ## 与我联系：
