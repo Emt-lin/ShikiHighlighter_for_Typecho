@@ -33,6 +33,9 @@ class ShikiHighlighter_Plugin implements Typecho_Plugin_Interface
             _t('选择适合的 Shiki 高亮主题')
         );
         $form->addInput($theme->addRule('enum', _t('必须选择配色样式'), array_keys($themes)));
+
+        $cdnDomain = new Typecho_Widget_Helper_Form_Element_Text('cdnDomain', NULL, 'https://esm.run', _t('CDN 域名（如果不懂，请不要修改）'), _t('输入 Shiki 资源的 CDN 域名。'));
+        $form->addInput($cdnDomain);
     }
 
     public static function personalConfig(Typecho_Widget_Helper_Form $form)
@@ -50,6 +53,7 @@ class ShikiHighlighter_Plugin implements Typecho_Plugin_Interface
     public static function header()
     {
         $theme = Helper::options()->plugin('ShikiHighlighter')->theme;
+        $cdnDomain = Helper::options()->plugin('ShikiHighlighter')->cdnDomain;
 
         echo <<<EOT
     <style type="text/css">
@@ -86,8 +90,8 @@ class ShikiHighlighter_Plugin implements Typecho_Plugin_Interface
         }
     </style>
     <script type="module">
-        // https://esm.run/shiki/themes/ + xxx
-        // https://esm.run/shiki/core
+        // ${cdnDomain}/shiki/themes/ + xxx
+        // ${cdnDomain}/shiki/core
         const darkTheme = 'github-dark'
         const [
             {getHighlighterCore},
@@ -96,11 +100,11 @@ class ShikiHighlighter_Plugin implements Typecho_Plugin_Interface
             dark,
             {bundledLanguages},
         ] = await Promise.all([
-            import('https://esm.run/shiki/core'),
-            import('https://esm.run/shiki/wasm'),
-            import('https://esm.run/shiki/themes/${theme}' ),
-            import('https://esm.run/shiki/themes/' + darkTheme),
-            import('https://esm.run/shiki/langs')
+            import('${cdnDomain}/shiki/core'),
+            import('${cdnDomain}/shiki/wasm'),
+            import('${cdnDomain}/shiki/themes/${theme}' ),
+            import('${cdnDomain}/shiki/themes/' + darkTheme),
+            import('${cdnDomain}/shiki/langs')
         ])
             
         const highlighter = await getHighlighterCore({
