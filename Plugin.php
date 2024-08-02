@@ -15,6 +15,7 @@ class ShikiHighlighter_Plugin implements Typecho_Plugin_Interface
     {
         Typecho_Plugin::factory('Widget_Archive')->header = array(__CLASS__, 'header');
         Typecho_Plugin::factory('Widget_Archive')->footer = array(__CLASS__, 'footer');
+        Typecho_Plugin::factory('Widget_Archive')->singleHandle = array(__CLASS__, 'singleHandle');
     }
 
     public static function deactivate()
@@ -42,6 +43,17 @@ class ShikiHighlighter_Plugin implements Typecho_Plugin_Interface
     {
     }
 
+    public static function singleHandle($archive)
+    {
+        $content = $archive->content;
+        if (strpos($content, '```') !== false || strpos($content, '<pre><code') !== false) {
+            $archive->containsCode = true;
+        } else {
+            $archive->containsCode = false;
+        }
+    }
+
+
     public static function render($text, $widget, $lastResult)
     {
     }
@@ -55,7 +67,10 @@ class ShikiHighlighter_Plugin implements Typecho_Plugin_Interface
         $theme = Helper::options()->plugin('ShikiHighlighter')->theme;
         $cdnDomain = Helper::options()->plugin('ShikiHighlighter')->cdnDomain;
 
-        echo <<<EOT
+        // 检查当前文章内容是否包含代码块
+        if ($widget = Typecho_Widget::widget('Widget_Archive')) {
+            if (isset($widget->containsCode) && $widget->containsCode) {
+                echo <<<EOT
     <style type="text/css">
         .shiki,.shiki-themes {
             margin-bottom: 0!important;;
@@ -128,6 +143,8 @@ class ShikiHighlighter_Plugin implements Typecho_Plugin_Interface
         
     </script>
 EOT;
+            }
+        }
     }
 
     public static function footer()
