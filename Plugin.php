@@ -5,7 +5,7 @@
  * 使用 Shiki 的代码高亮插件，用户可设置不同风格
  *
  * @package ShikiHighlighter
- * @version 1.0.0
+ * @version 2.0.0
  * @author wyh
  * @link https://www.pslanys.com
  */
@@ -35,8 +35,23 @@ class ShikiHighlighter_Plugin implements Typecho_Plugin_Interface
         );
         $form->addInput($theme->addRule('enum', _t('必须选择配色样式'), array_keys($themes)));
 
-        $cdnDomain = new Typecho_Widget_Helper_Form_Element_Text('cdnDomain', NULL, 'https://esm.run', _t('CDN 域名（如果不懂，请不要修改）'), _t('输入 Shiki 资源的 CDN 域名。'));
+        $cdnDomain = new Typecho_Widget_Helper_Form_Element_Text(
+            'cdnDomain',
+            NULL,
+            'https://esm.sh,https://esm.run',
+            _t('CDN 域名（支持逗号分隔，按顺序 fallback）'),
+            _t('输入 Shiki 资源的 CDN 域名列表，例如：https://esm.sh,https://esm.run')
+        );
         $form->addInput($cdnDomain);
+
+        $shikiVersion = new Typecho_Widget_Helper_Form_Element_Text(
+            'shikiVersion',
+            NULL,
+            '3.0.0',
+            _t('Shiki 版本（建议锁定）'),
+            _t('例如：3.0.0；留空表示使用 CDN 默认版本（不推荐）')
+        );
+        $form->addInput($shikiVersion);
     }
 
     public static function personalConfig(Typecho_Widget_Helper_Form $form)
@@ -59,137 +74,53 @@ class ShikiHighlighter_Plugin implements Typecho_Plugin_Interface
     }
 
     /**
-     *为header添加css文件
+     * 为header添加css和配置
      * @return void
      */
     public static function header()
     {
-        $theme = Helper::options()->plugin('ShikiHighlighter')->theme;
-        $cdnDomain = Helper::options()->plugin('ShikiHighlighter')->cdnDomain;
-
         // 检查当前文章内容是否包含代码块
-        if ($widget = Typecho_Widget::widget('Widget_Archive')) {
-            if (isset($widget->containsCode) && $widget->containsCode) {
-                echo <<<EOT
-    <style type="text/css">
-        .shiki,.shiki-themes {
-            margin-bottom: 0!important;;
+        $widget = Typecho_Widget::widget('Widget_Archive');
+        if (!isset($widget->containsCode) || !$widget->containsCode) {
+            return;
         }
-        
-        .shiki,
-        .shiki span {
-          /*background-color: initial!important;*/
-        }
-        
-        @media (prefers-color-scheme: dark) {
-          .shiki,
-          .shiki span {
-            color: var(--shiki-dark) !important;
-            /*background-color: var(--shiki-dark-bg) !important;*/
-            /* 可选，用于定义字体样式 */
-            font-style: var(--shiki-dark-font-style) !important;
-            font-weight: var(--shiki-dark-font-weight) !important;
-            text-decoration: var(--shiki-dark-text-decoration) !important;
-          }
-        }
-        html.dark .shiki,
-        html.dark .shiki span,
-        body.dark-mode .shiki,
-        body.dark-mode .shiki span {
-          color: var(--shiki-dark) !important;
-          /*background-color: var(--shiki-dark-bg) !important;*/
-          /* 可选，用于定义字体样式 */
-          font-style: var(--shiki-dark-font-style) !important;
-          font-weight: var(--shiki-dark-font-weight) !important;
-          text-decoration: var(--shiki-dark-text-decoration) !important;
-        }
-    </style>
-    <script type="module">
-        // ${cdnDomain}/shiki/themes/ + xxx
-        // ${cdnDomain}/shiki/core
-        const darkTheme = 'github-dark'
-        const [
-            {getHighlighterCore},
-            getWasm,
-            selfTheme,
-            dark,
-            {bundledLanguages},
-        ] = await Promise.all([
-            import('${cdnDomain}/shiki/core'),
-            import('${cdnDomain}/shiki/wasm'),
-            import('${cdnDomain}/shiki/themes/${theme}' ),
-            import('${cdnDomain}/shiki/themes/' + darkTheme),
-            import('${cdnDomain}/shiki/langs')
-        ])
-            
-        const highlighter = await getHighlighterCore({
-            themes: [
-                selfTheme,
-                dark,
-            ],
-            // 初始不加载任何语言
-            langs: [],
-            loadWasm: getWasm
-        });
-    
-        // 将 highlighter 和 bundledLanguages 存储在 window 对象中
-        window.shikiHighlighter = {
-            highlighter,
-            bundledLanguages,
-            darkTheme,
-        }
-        // 触发自定义事件，通知初始化完成
-        document.dispatchEvent(new Event('shikiInitialized'));
-        
-    </script>
+
+        $options = Helper::options();
+        $pluginUrl = $options->pluginUrl . '/ShikiHighlighter';
+        $version = '1.0.0'; // 用于缓存控制
+
+        $theme = (string) $options->plugin('ShikiHighlighter')->theme;
+        $cdnDomain = (string) $options->plugin('ShikiHighlighter')->cdnDomain;
+        $shikiVersion = trim((string) $options->plugin('ShikiHighlighter')->shikiVersion);
+
+        // 配置 JSON（防止 </script> 注入）
+        $config = json_encode([
+            'theme' => $theme,
+            'darkTheme' => 'github-dark',
+            'cdn' => $cdnDomain,
+            'version' => $shikiVersion
+        ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+
+        echo <<<EOT
+    <link rel="stylesheet" href="{$pluginUrl}/assets/shiki.css?v={$version}">
+    <script type="application/json" id="shiki-config">{$config}</script>
 EOT;
-            }
-        }
     }
 
     public static function footer()
     {
-        $theme = Helper::options()->plugin('ShikiHighlighter')->theme;
+        // 检查当前文章内容是否包含代码块
+        $widget = Typecho_Widget::widget('Widget_Archive');
+        if (!isset($widget->containsCode) || !$widget->containsCode) {
+            return;
+        }
+
+        $options = Helper::options();
+        $pluginUrl = $options->pluginUrl . '/ShikiHighlighter';
+        $version = '1.0.0';
 
         echo <<<EOT
-<style type="text/css">
-        .post-content pre.loaded {
-            box-shadow: rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0.1) 0px 1px 3px 0px, rgba(0, 0, 0, 0.1) 0px 1px 2px -1px;
-        }
-        </style>
-<script type="module">
-   const highlightCode = () => {
-           document.addEventListener("DOMContentLoaded", function () {
-               document.addEventListener('shikiInitialized', function() {
-                // enable highlighter and bundledLanguages already init
-                if (window.shikiHighlighter) {
-                    const {highlighter, bundledLanguages, darkTheme} = window.shikiHighlighter
-                    
-                    document.querySelectorAll('pre code').forEach(async (block) => {
-                        const langMatch = block.className.match(/[lang|language]-([\w-]+)/);
-                        const lang = langMatch ? langMatch[1].toLowerCase() : 'plaintext';
-                       
-                        if (!highlighter.getLoadedLanguages().includes(lang)) {
-                            const importFn = bundledLanguages[lang]
-                            if (!importFn) return
-                            await highlighter.loadLanguage(await importFn);
-                        }
-                        block.innerHTML = highlighter.codeToHtml(block.textContent, {
-                            lang, 
-                            themes: {
-                                light: '${theme}',
-                                dark: darkTheme
-                            }
-                        });
-                    });
-                } else {
-                    console.error("Shiki Highlighter or Bundled Languages are not initialized.");
-                }
-        });
-    });
-   }
-    highlightCode();
-</script>
+<script type="module" src="{$pluginUrl}/assets/shiki.js?v={$version}"></script>
 EOT;
     }
 
